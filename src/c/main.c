@@ -7,6 +7,8 @@ static Window *s_main_window;
 static TextLayer *s_time_layer;
 static TextLayer *s_hexcolor_layer;
 
+static char s_buffer[8]; //write current hours and minutes into buffer
+
 static BitmapLayer *color_layer;
 
 unsigned long hex2int(char *a, unsigned int len) //converts hexadecimal number to integer
@@ -57,18 +59,77 @@ static void update_time() {
   time_t temp = time(NULL); 
   struct tm *tick_time = localtime(&temp); //get a time structure setup
 
-  static char s_buffer[8]; //write current hours and minutes into buffer
   strftime(s_buffer, sizeof(s_buffer), clock_is_24h_style() ?
                                           "%H:%M" : "%l:%M", tick_time);
 
   text_layer_set_text(s_time_layer, s_buffer); //display the time on the textlayer
 }
 
-static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  update_background();
-  update_time();
-  
+void on_animation_stopped(Animation *anim, bool finished, void *context)
+{
+    //Free the memory used by the Animation
+    property_animation_destroy((PropertyAnimation*) anim);
 }
+ 
+void animate_layer(Layer *layer, GRect *start, GRect *finish, int duration, int delay)
+{
+    //Declare animation
+    PropertyAnimation *anim = property_animation_create_layer_frame(layer, start, finish);
+ 
+    //Set characteristics
+    animation_set_duration((Animation*) anim, duration);
+    animation_set_delay((Animation*) anim, delay);
+ 
+    //Set stopped handler to free memory
+    AnimationHandlers handlers = {
+        //The reference to the stopped handler is the only one in the array
+        .stopped = (AnimationStoppedHandler) on_animation_stopped
+    };
+    animation_set_handlers((Animation*) anim, handlers, NULL);
+ 
+    //Start animation!
+    animation_schedule((Animation*) anim);
+}
+
+static void move_text_layers_offscreen(TextLayer *layer){
+  GRect bounds = layer_get_frame(text_layer_get_layer(layer));
+
+  GRect start = GRect(0, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
+  GRect finish = GRect(144, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
+
+  animate_layer(text_layer_get_layer(layer), &start, &finish, 300, 500);
+}
+
+static void move_text_layers_onscreen(TextLayer *layer){
+  GRect bounds = layer_get_frame(text_layer_get_layer(layer));
+
+  GRect start = GRect(-144, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
+  GRect finish = GRect(0, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
+
+  animate_layer(text_layer_get_layer(layer), &start, &finish, 300, 500);
+}
+
+static void tick_handler_seconds(struct tm *tick_time, TimeUnits units_changed) {
+    int seconds = tick_time->tm_sec;
+ 
+    if(seconds == 59){
+        move_text_layers_offscreen(s_time_layer);
+        move_text_layers_offscreen(s_hexcolor_layer);
+
+    }else if(seconds == 0){
+        //change properties behind the scenees
+        update_time();
+        update_background();
+      
+        //Slide onscreen from the left
+        move_text_layers_onscreen(s_time_layer);
+        move_text_layers_onscreen(s_hexcolor_layer);
+    }else{
+        text_layer_set_text(s_time_layer, s_buffer);
+    }
+}
+
+
 
 static void main_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window); //get window information
@@ -117,8 +178,9 @@ static void init() {
   window_stack_push(s_main_window, true); //show the Window on the watch, with animated=true
 
   update_time(); //make sure the time is displayed from the start
+  update_background();
 
-  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler); //register with TickTimerService
+  tick_timer_service_subscribe(SECOND_UNIT, (TickHandler) tick_handler_seconds);
 }
 
 static void deinit() {
