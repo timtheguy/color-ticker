@@ -7,9 +7,8 @@ static Window *s_main_window;
 static TextLayer *s_time_layer;
 static TextLayer *s_hexcolor_layer;
 
-static char s_buffer[8]; //write current hours and minutes into buffer
 
-static BitmapLayer *color_layer;
+static char s_buffer[8]; //write current hours and minutes into buffer
 
 unsigned long hex2int(char *a, unsigned int len) //converts hexadecimal number to integer
 {
@@ -91,19 +90,19 @@ void animate_layer(Layer *layer, GRect *start, GRect *finish, int duration, int 
     animation_schedule((Animation*) anim);
 }
 
-static void move_text_layers_offscreen(TextLayer *layer){
+static void move_text_layers_offscreen(TextLayer *layer, int direction){
   GRect bounds = layer_get_frame(text_layer_get_layer(layer));
 
   GRect start = GRect(0, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
-  GRect finish = GRect(144, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
+  GRect finish = GRect((direction * 144), bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
 
   animate_layer(text_layer_get_layer(layer), &start, &finish, 300, 500);
 }
 
-static void move_text_layers_onscreen(TextLayer *layer){
+static void move_text_layers_onscreen(TextLayer *layer, int direction){
   GRect bounds = layer_get_frame(text_layer_get_layer(layer));
 
-  GRect start = GRect(-144, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
+  GRect start = GRect((direction * -144), bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
   GRect finish = GRect(0, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
 
   animate_layer(text_layer_get_layer(layer), &start, &finish, 300, 500);
@@ -113,17 +112,18 @@ static void tick_handler_seconds(struct tm *tick_time, TimeUnits units_changed) 
     int seconds = tick_time->tm_sec;
  
     if(seconds == 59){
-        move_text_layers_offscreen(s_time_layer);
-        move_text_layers_offscreen(s_hexcolor_layer);
+        move_text_layers_offscreen(s_time_layer, 1);
+        move_text_layers_offscreen(s_hexcolor_layer, 1);
+        //slide right CURRENT color layer
 
     }else if(seconds == 0){
         //change properties behind the scenees
         update_time();
-        update_background();
-      
+        update_background();              
+        
         //Slide onscreen from the left
-        move_text_layers_onscreen(s_time_layer);
-        move_text_layers_onscreen(s_hexcolor_layer);
+        move_text_layers_onscreen(s_time_layer, 1);
+        move_text_layers_onscreen(s_hexcolor_layer, 1);
     }else{
         text_layer_set_text(s_time_layer, s_buffer);
     }
@@ -163,7 +163,6 @@ static void main_window_load(Window *window) {
 static void main_window_unload(Window *window) {
   text_layer_destroy(s_time_layer);
   text_layer_destroy(s_hexcolor_layer);
-  bitmap_layer_destroy(color_layer);
 }
 
 
