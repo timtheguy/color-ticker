@@ -103,7 +103,7 @@ static void move_text_layers_onscreen(TextLayer *layer, int direction){
   GRect bounds = layer_get_frame(text_layer_get_layer(layer));
 
   GRect start = GRect((direction * -144), bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
-  GRect finish = GRect(0, bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
+  GRect finish = GRect(PBL_IF_ROUND_ELSE(20, 0), bounds.origin.y, 144, bounds.size.w); //starting x, starting y, width x, width y
 
   animate_layer(text_layer_get_layer(layer), &start, &finish, 300, 500);
 }
